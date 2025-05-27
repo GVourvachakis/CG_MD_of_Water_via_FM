@@ -1,0 +1,130 @@
+# LAMMPS input script for atomistic water simulation
+# using TIP3P water model for force-matching
+
+# USAGE:
+# OMP_NUM_THREADS=4 mpirun -np 4 --bind-to core --map-by core $CONDA_PREFIX/bin/lmp -in in.aa_simulation
+
+# Generate GIF from png snapshots:
+# ffmpeg -pattern_type glob -framerate 10 -i './dump_images/image_*.png' -vf "fps=10,scale=800:-1:flags=lanczos" aa_simulation.gif
+
+# GIF Generation with ps timer:
+# ffmpeg \
+#   -pattern_type glob \
+#   -framerate 10 \
+#   -i 'dump_images/image_*.png' \
+#   -vf "fps=10, \
+#        scale=800:-1:flags=lanczos, \
+#        drawtext=
+#          fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+#          text='%{eif\\:n*2\\:d} ps':
+#          x=10: y=10:
+#          fontsize=24:
+#          fontcolor=white:
+#          box=1:
+#          boxcolor=black@0.5" \
+#   -loop 0 \
+#   aa_simulation.gif
+
+# --- Initialization ---
+units       real
+atom_style  full
+boundary    p p p
+dimension   3
+
+# --- Force field definitions ---
+# TIP3P water model parameters
+pair_style  lj/cut/coul/long 10.0
+pair_modify shift yes mix arithmetic
+kspace_style pppm 1.0e-4
+bond_style  harmonic
+angle_style harmonic
+
+# --- Read initial configuration ---
+# This assumes a pre-equilibrated box of water molecules
+# If you don't have a configuration file, you can use Packmol to create one
+read_data   initial_water.data
+
+thermo 1000
+thermo_style custom step temp press vol density etotal
+
+# Water-water LJ parameters for TIP3P
+pair_coeff  1 1 0.102 3.188  # O-O
+pair_coeff  2 2 0.000 0.000  # H-H
+# Bond and angle parameters
+bond_coeff  1 450.0 0.9572   # O-H bond
+angle_coeff 1 55.0 104.52    # H-O-H angle
+
+# --- Setup masses ---
+mass 1 15.9994  # O
+mass 2 1.008    # H
+
+# --- Settings ---
+# Special bonds settings for water
+special_bonds lj/coul 0.0 0.0 0.5
+neighbor 2.5 bin
+neigh_modify every 1 delay 0 check yes one 10000  # max neighbors
+
+# --- MD settings ---
+timestep 1.0  # 1 fs timestep
+# --- Initial minimization ---
+minimize 1.0e-4 1.0e-6 5000 50000
+
+# --- Add a short NVT equilibration before NPT ---
+print "Starting short NVT equilibration phase"
+fix 1 all shake 0.0001 20 0 b 1 a 1
+fix 2 all nvt temp 50.0 300.0 100.0  # Gentle temperature ramp-up
+thermo 500
+run 5000  # 5 ps gentle heating
+
+# --- Equilibration in NPT with gentle pressure coupling ---
+print "Starting NPT equilibration phase"
+unfix 2
+fix 2 all npt temp 300.0 300.0 100.0 iso 1.0 1.0 2000.0  # Slow pressure coupling
+thermo 1000
+thermo_style custom step temp press vol density etotal
+
+# Run NPT in stages with careful monitoring
+print "NPT stage 1: 10ps"
+run 10000  # 10 ps initial NPT
+
+# Check and reset if needed
+print "NPT stage 2: 20ps"
+run 20000  # 20 ps more NPT
+
+print "NPT stage 3: 20ps"
+run 20000  # Final 20 ps NPT
+
+# --- Switch to NVT for production ---
+print "Starting NVT production phase"
+unfix 2
+reset_timestep 0
+fix 2 all nvt temp 300.0 300.0 100.0  # Nosé-Hoover thermostat
+
+# --- Production run ---
+# Define output frequency
+variable nfreq equal 100   # Save every 100 steps = 100 fs
+thermo ${nfreq}
+
+# Create output directories
+shell mkdir traj forces dump_images restart
+
+# Output trajectory and force information
+dump 1 all custom ${nfreq} traj/water_*.lammpstrj id type x y z
+dump 2 all custom ${nfreq} forces/force_*.dump id type fx fy fz
+
+# Adjust "size", "zoom", and "view" as needed
+dump           3 all image 1000 ./dump_images/image_*.png type type size 1024 1024 zoom 1.2 adiam 1.0
+dump_modify    3 pad 5 # high-frequency, zero-padded for smooth GIF
+
+# Force H (type 2) to white, O (type 1) stays red
+dump_modify 3 acolor 1 red acolor 2 white
+
+# (Optional) Add restart capability
+restart 10000 ./restart/restart.water
+
+# Run production for 1 ns (1,000,000 steps)
+print "Starting 1 ns production run..."
+run 1000000
+
+# --- Cleanup ---
+print "Atomistic simulation complete."
