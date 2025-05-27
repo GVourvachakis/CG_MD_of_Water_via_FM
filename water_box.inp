@@ -1,0 +1,9 @@
+# Packmol input file to create a box of 1000 water molecules
+tolerance 2.0
+filetype xyz
+output water_initial.xyz
+
+structure water.xyz
+  number 1000
+  inside box 0. 0. 0. 40. 40. 40.
+end structure

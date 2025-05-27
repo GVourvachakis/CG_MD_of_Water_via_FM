@@ -1,0 +1,52 @@
+Initializing force-matching with 8 threads
+Found 10004 frames for force-matching
+System has 1000 particles
+Optimizing potential with 30 iterations
+Using stochastic gradient descent for large dataset
+Starting stochastic optimization with 100 frames per step
+Iter   1 | Train: 538238516916921.750000 | lr=1.00e-02 | time=2965.695 sec
+Iter   2 | Train: 1612.015818 | lr=9.80e-03 | time=2969.016 sec
+Iter   3 | Train: 1609.089542 | lr=9.60e-03 | time=2983.043 sec
+Iter   4 | Train: 1609.323996 | lr=9.41e-03 | time=3066.117 sec
+Iter   5 | Train: 1592.920888 | Val: 1573.057414 | lr=9.22e-03 | time=2972.629 sec
+  New best parameters.
+Iter   6 | Train: 1597.104042 | lr=9.04e-03 | time=2919.406 sec
+Iter   7 | Train: 1583.497214 | lr=8.86e-03 | time=2914.059 sec
+Iter   8 | Train: 1576.293605 | lr=8.68e-03 | time=2932.008 sec
+Iter   9 | Train: 1566.825550 | lr=8.51e-03 | time=2883.059 sec
+Iter  10 | Train: 1557.067846 | Val: 1537.175270 | lr=8.34e-03 | time=2940.000 sec
+  New best parameters.
+Iter  11 | Train: 1555.134421 | lr=8.17e-03 | time=3017.476 sec
+Iter  12 | Train: 1551.691596 | lr=8.01e-03 | time=3316.840 sec
+Iter  13 | Train: 1541.426293 | lr=7.85e-03 | time=2980.997 sec
+Iter  14 | Train: 1538.535567 | lr=7.69e-03 | time=3005.012 sec
+Iter  15 | Train: 1516.961247 | Val: 1503.993468 | lr=7.54e-03 | time=2987.491 sec
+  New best parameters.
+Iter  16 | Train: 1522.156867 | lr=7.39e-03 | time=2925.635 sec
+Iter  17 | Train: 1518.939257 | lr=7.24e-03 | time=2962.195 sec
+Iter  18 | Train: 1512.442569 | lr=7.09e-03 | time=2888.158 sec
+Iter  19 | Train: 1505.891200 | lr=6.95e-03 | time=2931.779 sec
+Iter  20 | Train: 1504.425429 | Val: 1474.364008 | lr=6.81e-03 | time=2961.739 sec
+  New best parameters.
+Iter  21 | Train: 1488.022348 | lr=6.68e-03 | time=2899.165 sec
+Iter  22 | Train: 1491.774692 | lr=6.54e-03 | time=2920.829 sec
+Iter  23 | Train: 1480.520838 | lr=6.41e-03 | time=2874.625 sec
+Iter  24 | Train: 1466.560080 | lr=6.28e-03 | time=2866.297 sec
+Iter  25 | Train: 1474.720524 | Val: 1448.015073 | lr=6.16e-03 | time=2945.041 sec
+  New best parameters.
+Iter  26 | Train: 1457.667375 | lr=6.03e-03 | time=2982.787 sec
+Iter  27 | Train: 1458.020677 | lr=5.91e-03 | time=2919.819 sec
+Iter  28 | Train: 1455.432835 | lr=5.80e-03 | time=2904.716 sec
+Iter  29 | Train: 1449.583417 | lr=5.68e-03 | time=2911.647 sec
+Iter  30 | Train: 1439.988611 | Val: 1424.547611 | lr=5.57e-03 | time=2924.336 sec
+  New best parameters.
+SGD optimization complete. Best val loss: 1424.547611
+Total time: 88716.753s (~ 1 day and 39 mins) | Average step time: 2955.721s
+Parameters logged to spline_params_log.txt
+Training GIF saved as training.gif
+Validation Metrics:
+Mean Squared Error: 1439.466885
+Directional Consistency (cosine similarity): 0.012260
+Wasserstein Distance: 25.570094
+LAMMPS tabulated potential written to force_matching_results_new/cg_water_potential.table
+Force-matching complete. Results saved to: force_matching_results_new

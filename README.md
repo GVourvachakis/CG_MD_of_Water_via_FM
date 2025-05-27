@@ -1,0 +1,165 @@
+# Coarse-Grained MD of Homogeneous Liquid Water via Force Matching
+
+This repository accompanies the [ΕΥΜ-272 “Modeling of Physical Systems and Machine Learning Methods”](https://elearn.uoc.gr/course/view.php?id=5856) course at the University of Crete. It implements a pipeline for coarse-graining (CG) molecular dynamics of homogeneous liquid water using the Force Matching (FM) method to reconstruct coarse-grained forces from fine-grained reference data.
+
+> **📋 For Detailed Documentation**: For a comprehensive description of the development process, theoretical background, computational setup, and detailed analysis methodology, please refer to the complete project report: **[`cg_report.pdf`](./cg_report.pdf)**. The PDF contains extensive details on the validation procedures, and in-depth discussion of results that complement this markdown.
+
+## Project Overview
+
+Water exhibits complex hydrogen‐bonding and directional interactions that challenge coarse‐grained modeling. In this project, we:
+
+- **Generate** atomistic water configurations and run all‐atom (AA) molecular dynamics with [LAMMPS-2024.8.29](https://github.com/lammps/lammps/releases/tag/stable_29Aug2024_update1).
+- **Map** AA snapshots onto a one‐site CG representation (each CG bead represents one water molecule).
+- **Parameterize** non‐bonded CG interactions by minimizing the empirical mean squared error (MSE) between local mean forces from AA trajectories and forces predicted by a spline‐based CG potential:
+  - Force Matching (FM) with an \($L_2$\) norm objective.
+  - Cubic B-spline basis expansion of pairwise potentials.
+  - Hyperparameters: batch size for multiprocessing, frames per optimization step, number of threads, maximum iterations.
+- **Validate** the CG model structurally (radial distribution functions, coordination numbers).
+- **Simulate** CG dynamics and compare to AA reference.
+
+This pipeline lays the groundwork for further extensions such as many-body terms, orientation-dependent potentials, automated hyperparameter tuning, and dynamic property validation.
+
+## Features
+
+- Fully automated `pipeline.sh` to run from AA setup through CG analysis
+- Spline-based functional form for CG pair potentials
+- Force Matching via batch‐wise MSE optimization
+- Structural analysis of water: radial distribution functions (RDFs), coordination
+- Modular Python scripts for mapping, FM optimization, simulation input generation, and analysis
+- Example output figures and animations under `prior_results/`
+
+---
+
+## Prerequisites
+
+- **Operating System**: Linux / macOS
+- **Conda** with [Python 3.11.11](https://www.python.org/downloads/release/python-31111/)
+- **LAMMPS 2024.8.29** installed in a Conda environment (`$CONDA_PREFIX/lammps_env/bin/lmp`)
+- Python packages:
+  ```bash
+  conda install -c conda-forge \
+    numpy=2.2.4 scipy=1.14.1 matplotlib=3.10.1 \
+    hoomd=5.1.1  # optional
+
+  # install packmol for water model construction
+  conda install conda-forge::packmol
+
+  pip install gleqpy==1.0.3  # optional (memory-kernel analysis)
+
+## Installing LAMMPS 2024.8.29
+
+### 1. Clone stable branch
+```
+git clone -b stable https://github.com/lammps/lammps.git
+cd lammps
+```
+### 2. Configure with MPI, OpenMP, Python, and required packages
+```
+cmake ../cmake \
+    -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
+    -DBUILD_MPI=YES \
+    -DBUILD_OMP=YES \
+    -DBUILD_SHARED_LIBS=YES \
+    -DLAMMPS_EXCEPTIONS=YES \
+    -DPKG_KSPACE=YES \
+    -DPKG_MANYBODY=YES \
+    -DPKG_MOLECULE=YES \
+    -DPKG_PYTHON=YES \
+    -DPKG_USER-GLE=YES \
+    -DWITH_PNG=YES \
+    -DWITH_FFMPEG=YES
+```
+### 3. Build & install
+```
+make -j$(nproc)
+make install
+```
+### 4.  Install Python bindings
+```
+cd python
+pip install -e .
+```
+### 5. Verify
+```
+which $CONDA_PREFIX/bin/lmp
+$CONDA_PREFIX/bin/lmp -h
+```
+
+## Repository Structure
+```
+.
+├── cg_report.pdf                # project's report
+├── cg_water_pres.pdf                # presentation slides
+├── analysis.py                # Post-processing & plotting
+├── cg_mapping.py              # Map AA frames to CG representation
+├── force_matching.py          # FM optimization driver
+├── in.aa_simulation           # LAMMPS input for all-atom MD
+├── in.cg_simulation           # LAMMPS input for CG MD
+├── pipeline.sh                # End-to-end workflow script
+├── water_box.inp              # PACKMOL input for initial water box
+├── xyz_to_lammps.py           # Convert .xyz to LAMMPS data file
+└── prior_results/             # Example figures, gifs, and FM outputs
+    ├── aa_simulation.gif
+    ├── cg_simulation.gif
+    ├── adam_stochastic_mse_vs_iteration_LJ_lr_1e-3.png
+    ├── adam_stochastic_mse_vs_iteration_SPC_lr_1e-2.png
+    ├── force_matching_results_LJ/
+    ├── force_matching_results_SPC/
+    ├── logs/   # Logs generated by pipeline.sh
+    └── structural_analysis_*.*
+```        
+
+## Usage
+
+**Activate** your Conda environment with LAMMPS and Python dependencies:
+ ```bash
+ conda activate your_env_name
+ ```
+
+ **Make** the pipeline script executable:
+ ```bash
+ chmod +x pipeline.sh
+ ```
+
+ **Run** the full workflow:
+ ```bash
+ ./pipeline.sh
+ ```
+> **This will:**
+> 1. Create folders and initial water box ([water_box.inp](./water_box.inp) → `data.water`)
+> 2. Run AA simulation ([in.aa_simulation](./in.aa_simulation))
+> 3. Map AA trajectories to CG beads
+> 4. Optimize CG spline potentials via force matching
+> 5. Run CG simulation ([in.cg_simulation](./in.cg_simulation))
+> 6. Analyze structural outputs (RDFs, coordination) and save plots
+
+**Inspect** `logs/` for detailed stdout, and `prior_results/` for example outputs.
+
+## Customization
+
+- **Hyperparameters** in [force_matching.py](./force_matching.py):
+    ```
+    --n-threads     Number of OpenMP threads
+    --batch-size    Frames per optimization batch
+    --frames-per-step  Frames sampled each iteration
+    --max-iter      Maximum optimization steps
+    ```
+- **Potential basis:** Spline knot spacing and cutoff can be edited in [force_matching.py](./force_matching.py).
+
+- **LAMMPS executables:** Adjust `$CONDA_PREFIX/bin/lmp` if your path differs.
+
+## Contributing
+
+Contributions are welcome! Please fork the repo and submit pull requests for:
+
+- Many-body or directional CG potentials (e.g., [[S. T. John et al. (2017)](https://pubs.acs.org/doi/10.1021/acs.jpcb.7b09636)]).
+
+- Automated hyperparameter tuning (e.g., Bayesian optimization) (e.g., [[A. H. Victoria et al. (2020)](https://link.springer.com/article/10.1007/s12530-020-09345-2)]).
+
+- Dynamic property validation (diffusion, viscosity) (e.g., [[S. Markutsya et al. (2022)](https://pubs.acs.org/doi/10.1021/acsomega.2c03857)]).
+
+- Extensions to heterogeneous systems, proteins, or other solvents with hydrodynamic interactions (e.g., [[U. Kapoor et al. (2023)](https://pubs.acs.org/doi/10.1021/acs.jctc.3c00525)], [[R. Prabhakar et al. (2007)](https://doi.org/10.1103/PhysRevE.76.011809)]).
+
+## 📜 License & Citation
+
+This project is released under the MIT License. See [LICENSE](./LICENCE) for details.

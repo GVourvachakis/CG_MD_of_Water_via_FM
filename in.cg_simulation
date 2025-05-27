@@ -1,0 +1,128 @@
+# LAMMPS input script for coarse-grained water simulation
+# using force-matched potential
+
+# --- Initialization ---
+units       real
+atom_style  atomic  # Use atomic style for CG beads (not molecular)
+boundary    p p p
+dimension   3
+
+# --- Create CG system ---
+# We create a simple cubic lattice of CG beads
+# Each bead represents one water molecule
+# Get the number of water molecules from the atomistic system
+variable n_molecules equal 1000 # Should match the number of water molecules in AA sim
+
+# Create a cubic box
+variable    box_size equal 40.0  # Box size in Å (should match AA simulation)
+
+region      box block 0 ${box_size} 0 ${box_size} 0 ${box_size}
+create_box  1 box
+
+# Place exactly 1000 beads at random with minimum separation
+create_atoms 1 random 1000 54321 box overlap 1.0
+mass 1 18.01528
+
+neighbor    2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# --- Stage-1: Soft LJ minimization only ---
+print       "Stage-1 minimize: soft LJ only"
+pair_style  lj/cut 0.8
+pair_coeff  1 1 0.2 0.4 0.8
+
+min_style   cg
+minimize    1e-6 1e-8 5000 50000
+
+# --- Stage-2: Full LJ + Tabulated CG potential ---
+print       "Stage-2 minimize: hybrid/overlay LJ + table"
+pair_style  hybrid/overlay lj/cut 0.8 table linear 1000
+pair_coeff  1 1 lj/cut 1.0 0.4 0.8
+pair_coeff  1 1 table ./force_matching_results/cg_water_potential.table CG_WATER
+
+# Directly minimize to remove any overlaps and avoid high forces
+# (dynamic runs caused atoms to “fly” and be lost)
+print       "Stage-2 minimize: full LJ + CG table"
+min_style   cg
+minimize    1e-6 1e-8 10000 100000
+
+# --- Equilibration: Gentle Ramp at 1 fs ---
+print       "Equilibration Stage-1: 1 fs, strong damping"
+timestep    1.0                # 1 fs
+velocity    all create 300.0 12345 mom yes rot yes
+fix         eq_nve1 all nve
+# equilibration: gentle ramp (100 -> 300 K)
+fix         eq_lg1  all langevin 100.0 300.0 10.0 12345
+
+run         50000              # 50 ps
+
+# --- Equilibration Stage-2: Ramp to 2 fs, moderate damping ---
+unfix       eq_lg1
+unfix       eq_nve1
+
+print       "Equilibration Stage-2: 2 fs, normal damping"
+timestep    2.0
+fix         eq_nve2 all nve
+fix         eq_lg2  all langevin 100.0 300.0 100.0 699483
+
+run         50000              # 100 ps total equilibration
+
+# --- Production Run: 2 fs, constant T ---
+unfix       eq_lg2
+unfix       eq_nve2
+
+print       "Production Run: 2 fs, 300 K Langevin"
+reset_timestep 0
+fix         prod_nve all nve
+fix         prod_lg  all langevin 300.0 300.0 100.0 699483
+
+variable    nfreq equal 100
+thermo      ${nfreq}
+thermo_style custom step temp press vol density etotal pe ke
+
+shell       mkdir cg_traj dump_cg_images voronoi_cg_data
+
+# Trajectory & Images
+dump        prod_traj all custom ${nfreq} cg_traj/cg_water_*.lammpstrj id type x y z
+dump        prod_img  all image 1000 dump_cg_images/image_*.png type type size 1024 1024 zoom 1.2 adiam 2.0
+dump_modify prod_img pad 5 acolor 1 blue
+
+run         2500000            # 5 ns production
+
+# --- RDF Calculation ---
+print      "Computing RDF"
+compute    rdf all rdf 100 1 1
+fix        rdf_avg all ave/time ${nfreq} 1 ${nfreq} c_rdf[*] file cg_rdf.dat mode vector
+
+# --- Voronoi Analysis ---
+print      "Computing Voronoi volumes & neighbors"
+
+# 1) Compute Voronoi per atom
+compute    voro all voronoi/atom
+
+# 2) Define atom‐style variables
+variable   voro_vol       atom c_voro[1]
+variable   voro_neighbors atom c_voro[2]
+
+# 3) Dump frame‐by‐frame data every 5000 steps
+dump       voro_frame all custom 5000 voronoi_cg_data/voronoi_*.data id type x y z v_voro_vol v_voro_neighbors
+dump_modify voro_frame sort id
+
+# 4) Time‐averaged per‐atom properties
+fix        voro_avg   all ave/atom ${nfreq} 1 ${nfreq} v_voro_vol v_voro_neighbors
+dump       voro_atom  all custom 10000 voronoi_cg_data/voronoi_avg_*.data id type x y z f_voro_avg[1] f_voro_avg[2]
+dump_modify voro_atom sort id
+
+# 5) Global statistics
+compute    vg_avg  all reduce ave c_voro[1]
+compute    vg_min  all reduce min c_voro[1]
+compute    vg_max  all reduce max c_voro[1]
+compute    ng_avg  all reduce ave c_voro[2]
+compute    ng_min  all reduce min c_voro[2]
+compute    ng_max  all reduce max c_voro[2]
+
+fix        voro_global all ave/time 5000 1 5000 c_vg_avg c_vg_min c_vg_max c_ng_avg c_ng_min c_ng_max file voronoi_cg_data/voronoi_global_stats.dat
+
+run        500000             # 1 ns extra sampling
+
+print      "CG simulation complete."
