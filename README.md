@@ -99,8 +99,8 @@ $CONDA_PREFIX/bin/lmp -h
 ├── water_box.inp              # PACKMOL input for initial water box
 ├── xyz_to_lammps.py           # Convert .xyz to LAMMPS data file
 └── prior_results/             # Example figures, gifs, and FM outputs
-    ├── aa_simulation.gif
-    ├── cg_simulation.gif
+    ├── aa_simulation.mp4
+    ├── cg_simulation.mp4
     ├── adam_stochastic_mse_vs_iteration_LJ_lr_1e-3.png
     ├── adam_stochastic_mse_vs_iteration_SPC_lr_1e-2.png
     ├── force_matching_results_LJ/
